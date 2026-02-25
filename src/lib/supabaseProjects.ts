@@ -5,8 +5,7 @@ type DbProject = {
   id: string;
   name: string;
   description: string | null;
-  category: string;
-  type: string;
+  // category and type do NOT exist in DB; we keep them only in the frontend model
   overall_status: string;
   start_date: string;
   end_date: string;
@@ -36,25 +35,30 @@ function mapProjectToDb(userId: string, project: Project) {
     user_id: userId,
     name: project.name,
     description: project.description || null,
-    category: project.category,
-    type: project.type,
+    // category and type are not persisted because the table doesn't have these columns
     overall_status: project.status,
     start_date: project.startDate,
     end_date: project.endDate,
     progress: project.progress,
     tags: project.tags.length ? project.tags : null,
+    // store full team as JSON/array – matches existing team_members column
     team_members: project.team as TeamMember[],
   };
 }
 
 function mapDbToProject(row: DbProject, reports: WeeklyReport[]): Project {
   const team = (row.team_members as TeamMember[] | null) ?? [];
+
+  // The database does not store category/type; we fall back to safe defaults.
+  const defaultCategory: Project["category"] = "DevOps";
+  const defaultType: Project["type"] = "projeto";
+
   return {
     id: row.id,
     name: row.name,
     description: row.description ?? "",
-    category: row.category as Project["category"],
-    type: row.type as Project["type"],
+    category: defaultCategory,
+    type: defaultType,
     status: row.overall_status as Project["status"],
     startDate: row.start_date,
     endDate: row.end_date,
