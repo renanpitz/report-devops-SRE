@@ -12,6 +12,9 @@ import NewProjectModal from '@/components/NewProjectModal';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search, Upload, LayoutGrid, Activity, BarChart3, FolderKanban, Users, Plus } from 'lucide-react';
+import { createProjectWithReports } from '@/lib/supabaseProjects';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 const statusFilters: { label: string; value: ProjectStatus | 'all' }[] = [
   { label: 'Todos', value: 'all' },
@@ -34,6 +37,8 @@ const Index = () => {
   const [uploadOpen, setUploadOpen] = useState(false);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabView>('dashboard');
+  const [isSavingProject, setIsSavingProject] = useState(false);
+  const { toast } = useToast();
 
   const filteredProjects = useMemo(() => {
     return projects.filter(p => {
@@ -110,9 +115,31 @@ const Index = () => {
     }
   };
 
-  const handleCreateProject = (project: Project) => {
-    setProjects(prev => [project, ...prev]);
-    setActiveTab('projects');
+  const handleCreateProject = async (project: Project) => {
+    setIsSavingProject(true);
+    try {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError || !userData.user) {
+        throw userError ?? new Error('User not authenticated');
+      }
+      const userId = userData.user.id;
+
+      const saved = await createProjectWithReports(userId, project);
+      setProjects(prev => [saved, ...prev]);
+      setActiveTab('projects');
+      toast({
+        title: 'Projeto criado',
+        description: 'O projeto foi salvo no banco de dados com sucesso.',
+      });
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: 'Erro ao salvar projeto',
+        description: 'Não foi possível salvar o projeto no banco. Tente novamente.',
+      });
+    } finally {
+      setIsSavingProject(false);
+    }
   };
 
   if (selectedProject) {
@@ -276,9 +303,10 @@ const Index = () => {
                   size="sm"
                   className="gap-2"
                   onClick={() => setNewProjectOpen(true)}
+                  disabled={isSavingProject}
                 >
                   <Plus className="h-3.5 w-3.5" />
-                  Novo Projeto
+                  {isSavingProject ? 'Salvando...' : 'Novo Projeto'}
                 </Button>
               </div>
             </div>
