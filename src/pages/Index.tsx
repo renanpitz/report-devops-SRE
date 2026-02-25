@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Project, ProjectStatus, Professional } from '@/types/project';
 import { mockProjects } from '@/data/mockProjects';
 import { mockProfessionals } from '@/data/mockProfessionals';
@@ -13,9 +13,10 @@ import EditProjectModal from '@/components/EditProjectModal';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search, Upload, LayoutGrid, Activity, BarChart3, FolderKanban, Users, Plus } from 'lucide-react';
-import { createProjectWithReports, updateProjectWithReports } from '@/lib/supabaseProjects';
+import { createProjectWithReports, updateProjectWithReports, loadProjectsForUser } from '@/lib/supabaseProjects';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/providers/AuthProvider';
 
 const statusFilters: { label: string; value: ProjectStatus | 'all' }[] = [
   { label: 'Todos', value: 'all' },
@@ -27,6 +28,7 @@ const statusFilters: { label: string; value: ProjectStatus | 'all' }[] = [
 type TabView = 'dashboard' | 'projects' | 'team';
 
 const Index = () => {
+  const { user, loading: authLoading } = useAuth();
   const [projects, setProjects] = useState<Project[]>(mockProjects);
   const [professionals, setProfessionals] = useState<Professional[]>(mockProfessionals);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
@@ -41,7 +43,35 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState<TabView>('dashboard');
   const [isSavingProject, setIsSavingProject] = useState(false);
   const [isUpdatingProject, setIsUpdatingProject] = useState(false);
+  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
   const { toast } = useToast();
+
+  // Carrega projetos reais do Supabase para o usuário logado
+  useEffect(() => {
+    if (!user || authLoading) return;
+
+    setIsLoadingProjects(true);
+    loadProjectsForUser(user.id)
+      .then((dbProjects) => {
+        if (dbProjects.length > 0) {
+          setProjects(dbProjects);
+        } else {
+          // Se o usuário ainda não tem nada salvo, mantemos os mocks
+          setProjects(mockProjects);
+        }
+      })
+      .catch((error) => {
+        console.error('Erro ao carregar projetos do Supabase', error);
+        toast({
+          title: 'Não foi possível carregar seus projetos',
+          description: 'Mostrando dados de exemplo enquanto isso.',
+        });
+        setProjects(mockProjects);
+      })
+      .finally(() => {
+        setIsLoadingProjects(false);
+      });
+  }, [user, authLoading, toast]);
 
   const filteredProjects = useMemo(() => {
     return projects.filter(p => {
@@ -186,6 +216,14 @@ const Index = () => {
       setIsUpdatingProject(false);
     }
   };
+
+  if (isLoadingProjects && !selectedProjectId) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-sm text-muted-foreground">Carregando seus projetos...</p>
+      </div>
+    );
+  }
 
   if (selectedProject) {
     return (

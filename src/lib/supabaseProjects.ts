@@ -208,3 +208,55 @@ export async function updateProjectWithReports(
   // Novamente, usamos o team original como fallback caso o DB não devolva
   return mapDbToProject(updatedProject, weeklyReports, project.team);
 }
+
+/**
+ * Carrega todos os projetos do usuário com seus reports.
+ */
+export async function loadProjectsForUser(userId: string): Promise<Project[]> {
+  // 1) Buscar todos os projetos do usuário
+  const { data: projectsData, error: projectsError } = await supabase
+    .from("projects")
+    .select("*")
+    .eq("user_id", userId);
+
+  if (projectsError) {
+    throw projectsError;
+  }
+
+  const dbProjects = (projectsData ?? []) as DbProject[];
+  if (dbProjects.length === 0) {
+    return [];
+  }
+
+  const projectIds = dbProjects.map((p) => p.id);
+
+  // 2) Buscar todos os reports desses projetos de uma vez
+  const { data: reportsData, error: reportsError } = await supabase
+    .from("project_reports")
+    .select("*")
+    .in("project_id", projectIds)
+    .eq("user_id", userId);
+
+  if (reportsError) {
+    throw reportsError;
+  }
+
+  const dbReports = (reportsData ?? []) as DbProjectReport[];
+
+  // 3) Agrupar reports por projeto
+  const reportsByProject = new Map<string, WeeklyReport[]>();
+  dbReports.forEach((row) => {
+    const r = mapDbReportToWeeklyReport(row);
+    const existing = reportsByProject.get(row.project_id) ?? [];
+    existing.push(r);
+    reportsByProject.set(row.project_id, existing);
+  });
+
+  // 4) Ordenar reports por semana e montar Projects
+  return dbProjects.map((p) => {
+    const reports = (reportsByProject.get(p.id) ?? []).sort((a, b) =>
+      a.weekStart < b.weekStart ? 1 : -1,
+    );
+    return mapDbToProject(p, reports);
+  });
+}
