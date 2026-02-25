@@ -9,10 +9,11 @@ import ProfessionalModal from '@/components/ProfessionalModal';
 import TeamTab from '@/components/TeamTab';
 import UploadModal from '@/components/UploadModal';
 import NewProjectModal from '@/components/NewProjectModal';
+import EditProjectModal from '@/components/EditProjectModal';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search, Upload, LayoutGrid, Activity, BarChart3, FolderKanban, Users, Plus } from 'lucide-react';
-import { createProjectWithReports } from '@/lib/supabaseProjects';
+import { createProjectWithReports, updateProjectWithReports } from '@/lib/supabaseProjects';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -36,8 +37,10 @@ const Index = () => {
   const [dateTo, setDateTo] = useState('');
   const [uploadOpen, setUploadOpen] = useState(false);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [activeTab, setActiveTab] = useState<TabView>('dashboard');
   const [isSavingProject, setIsSavingProject] = useState(false);
+  const [isUpdatingProject, setIsUpdatingProject] = useState(false);
   const { toast } = useToast();
 
   const filteredProjects = useMemo(() => {
@@ -121,7 +124,6 @@ const Index = () => {
       const { data: userData, error: userError } = await supabase.auth.getUser();
 
       if (userError || !userData.user) {
-        // erro específico de falta de sessão
         toast({
           title: 'Você não está logado',
           description: 'Entre na sua conta para salvar projetos no banco de dados.',
@@ -149,6 +151,42 @@ const Index = () => {
     }
   };
 
+  const handleUpdateProject = async (project: Project) => {
+    setIsUpdatingProject(true);
+    try {
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+
+      if (userError || !userData.user) {
+        toast({
+          title: 'Você não está logado',
+          description: 'Entre na sua conta para editar projetos no banco de dados.',
+        });
+        return;
+      }
+
+      const userId = userData.user.id;
+      const updated = await updateProjectWithReports(userId, project);
+
+      setProjects(prev =>
+        prev.map(p => (p.id === updated.id ? updated : p)),
+      );
+
+      setEditingProject(null);
+      toast({
+        title: 'Projeto atualizado',
+        description: 'As alterações foram salvas com sucesso.',
+      });
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: 'Erro ao atualizar projeto',
+        description: 'Não foi possível salvar as alterações. Tente novamente.',
+      });
+    } finally {
+      setIsUpdatingProject(false);
+    }
+  };
+
   if (selectedProject) {
     return (
       <div className="min-h-screen bg-background">
@@ -157,11 +195,18 @@ const Index = () => {
             project={selectedProject}
             onBack={() => setSelectedProjectId(null)}
             onMemberClick={handleProfessionalClick}
+            onEdit={(p) => setEditingProject(p)}
           />
         </div>
         <ProfessionalModal
           professional={selectedProfessional}
           onClose={() => setSelectedProfessional(null)}
+        />
+        <EditProjectModal
+          isOpen={!!editingProject}
+          project={editingProject}
+          onClose={() => setEditingProject(null)}
+          onSave={handleUpdateProject}
         />
       </div>
     );
@@ -350,6 +395,12 @@ const Index = () => {
         isOpen={newProjectOpen}
         onClose={() => setNewProjectOpen(false)}
         onCreate={handleCreateProject}
+      />
+      <EditProjectModal
+        isOpen={!!editingProject && !selectedProject}
+        project={editingProject}
+        onClose={() => setEditingProject(null)}
+        onSave={handleUpdateProject}
       />
       <ProfessionalModal
         professional={selectedProfessional}

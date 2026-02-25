@@ -17,6 +17,7 @@ type DbProject = {
 type DbProjectReport = {
   id: string;
   project_id: string;
+  user_id: string;
   week_start: string;
   week_end: string;
   status: string;
@@ -46,8 +47,11 @@ function mapProjectToDb(userId: string, project: Project) {
   };
 }
 
-function mapDbToProject(row: DbProject, reports: WeeklyReport[]): Project {
-  const team = (row.team_members as TeamMember[] | null) ?? [];
+function mapDbToProject(row: DbProject, reports: WeeklyReport[], fallbackTeam?: TeamMember[]): Project {
+  // The database stores team_members as array/json; if it's null, we can fall back
+  // to a provided team (e.g. from the original object).
+  const teamFromDb = (row.team_members as TeamMember[] | null) ?? [];
+  const team = teamFromDb.length > 0 ? teamFromDb : fallbackTeam ?? [];
 
   // The database does not store category/type; we fall back to safe defaults.
   const defaultCategory: Project["category"] = "DevOps";
@@ -141,5 +145,61 @@ export async function createProjectWithReports(
     .map(mapDbReportToWeeklyReport)
     .sort((a, b) => (a.weekStart < b.weekStart ? 1 : -1));
 
-  return mapDbToProject(insertedProject, weeklyReports);
+  // Use original team as fallback if DB returns no team_members
+  return mapDbToProject(insertedProject, weeklyReports, project.team);
+}
+
+export async function updateProjectWithReports(
+  userId: string,
+  project: Project,
+): Promise<Project> {
+  // Atualiza os campos básicos do projeto
+  const { data: updatedProject, error: updateError } = await supabase
+    .from("projects")
+    .update(mapProjectToDb(userId, project))
+    .eq("id", project.id)
+    .eq("user_id", userId)
+    .select("*")
+    .single<DbProject>();
+
+  if (updateError || !updatedProject) {
+    throw updateError ?? new Error("Failed to update project");
+  }
+
+  // Estratégia simples para reports:
+  // 1) Remove reports antigos do usuário para este projeto
+  const { error: deleteError } = await supabase
+    .from("project_reports")
+    .delete()
+    .eq("project_id", project.id)
+    .eq("user_id", userId);
+
+  if (deleteError) {
+    throw deleteError;
+  }
+
+  let insertedReports: DbProjectReport[] = [];
+  if (project.weeklyReports.length > 0) {
+    const payload = project.weeklyReports.map((r) =>
+      mapReportToDb(userId, project.id, r),
+    );
+
+    const { data, error: insertError } = await supabase
+      .from("project_reports")
+      .insert(payload)
+      .select("*");
+
+    if (insertError) {
+      throw insertError;
+    }
+
+    insertedReports = (data ?? []) as DbProjectReport[];
+  }
+
+  const weeklyReports = insertedReports
+    .map(mapDbReportToWeeklyReport)
+    .sort((a, b) => (a.weekStart < b.weekStart ? 1 : -1));
+
+  // Novamente, usamos o team original como fallback caso o DB não devolva
+  return mapDbToProject(updatedProject, weeklyReports, project.team);
 }
