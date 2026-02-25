@@ -119,9 +119,16 @@ const Index = () => {
     setIsSavingProject(true);
     try {
       const { data: userData, error: userError } = await supabase.auth.getUser();
+
       if (userError || !userData.user) {
-        throw userError ?? new Error('User not authenticated');
+        // erro específico de falta de sessão
+        toast({
+          title: 'Você não está logado',
+          description: 'Entre na sua conta para salvar projetos no banco de dados.',
+        });
+        return;
       }
+
       const userId = userData.user.id;
 
       const saved = await createProjectWithReports(userId, project);
