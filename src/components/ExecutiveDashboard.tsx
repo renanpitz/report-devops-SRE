@@ -1,9 +1,27 @@
 import { useMemo } from 'react';
 import { Project, Professional } from '@/types/project';
-import { getStatusLabel } from '@/lib/projectUtils';
 import StatusBadge from './StatusBadge';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Building2, Users, Tag, AlertTriangle, CheckCircle, AlertCircle, FolderKanban, Wrench, Briefcase } from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from 'recharts';
+import {
+  Users,
+  Tag,
+  AlertTriangle,
+  CheckCircle,
+  AlertCircle,
+  FolderKanban,
+  Wrench,
+  Briefcase,
+} from 'lucide-react';
 
 interface ExecutiveDashboardProps {
   projects: Project[];
@@ -12,23 +30,44 @@ interface ExecutiveDashboardProps {
   onProjectClick: (id: string) => void;
 }
 
-const ExecutiveDashboard = ({ projects, professionals, onProfessionalClick, onProjectClick }: ExecutiveDashboardProps) => {
+const getInitials = (rawName: string | undefined | null) => {
+  const name = rawName?.trim() || '';
+  if (!name) return '?';
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .map((n) => n[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+};
+
+const ExecutiveDashboard = ({
+  projects,
+  professionals,
+  onProfessionalClick,
+  onProjectClick,
+}: ExecutiveDashboardProps) => {
   const stats = useMemo(() => {
-    const clients = [...new Set(projects.map(p => p.name))];
+    const clients = [...new Set(projects.map((p) => p.name))];
     const tags = projects.reduce<Record<string, number>>((acc, p) => {
-      p.tags.forEach(t => { acc[t] = (acc[t] || 0) + 1; });
+      p.tags.forEach((t) => {
+        acc[t] = (acc[t] || 0) + 1;
+      });
       return acc;
     }, {});
-    const sortedTags = Object.entries(tags).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    const sortedTags = Object.entries(tags)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
 
     const byType = {
-      operacao: projects.filter(p => p.type === 'operacao'),
-      projeto: projects.filter(p => p.type === 'projeto'),
+      operacao: projects.filter((p) => p.type === 'operacao'),
+      projeto: projects.filter((p) => p.type === 'projeto'),
     };
 
-    const stable = projects.filter(p => p.status === 'on-track' || p.status === 'completed');
-    const atRisk = projects.filter(p => p.status === 'at-risk');
-    const critical = projects.filter(p => p.status === 'delayed');
+    const stable = projects.filter((p) => p.status === 'on-track' || p.status === 'completed');
+    const atRisk = projects.filter((p) => p.status === 'at-risk');
+    const critical = projects.filter((p) => p.status === 'delayed');
 
     const byCategory = projects.reduce<Record<string, number>>((acc, p) => {
       acc[p.category] = (acc[p.category] || 0) + 1;
@@ -43,18 +82,37 @@ const ExecutiveDashboard = ({ projects, professionals, onProfessionalClick, onPr
       { name: 'Crítico', value: critical.length, color: 'hsl(0, 72%, 51%)' },
     ];
 
-    const uniqueMembers = new Map<string, { name: string; role: string; seniority: string; projectCount: number }>();
-    projects.forEach(p => {
-      p.team.forEach(m => {
-        if (uniqueMembers.has(m.name)) {
-          uniqueMembers.get(m.name)!.projectCount++;
+    const uniqueMembers = new Map<
+      string,
+      { name: string; role: string; seniority: string; projectCount: number }
+    >();
+    projects.forEach((p) => {
+      p.team.forEach((m) => {
+        const key = m.name || 'Sem nome';
+        if (uniqueMembers.has(key)) {
+          uniqueMembers.get(key)!.projectCount++;
         } else {
-          uniqueMembers.set(m.name, { name: m.name, role: m.role, seniority: m.seniority, projectCount: 1 });
+          uniqueMembers.set(key, {
+            name: key,
+            role: m.role,
+            seniority: m.seniority,
+            projectCount: 1,
+          });
         }
       });
     });
 
-    return { clients, sortedTags, byType, stable, atRisk, critical, categoryData, situationData, uniqueMembers: Array.from(uniqueMembers.values()) };
+    return {
+      clients,
+      sortedTags,
+      byType,
+      stable,
+      atRisk,
+      critical,
+      categoryData,
+      situationData,
+      uniqueMembers: Array.from(uniqueMembers.values()),
+    };
   }, [projects]);
 
   return (
@@ -100,7 +158,14 @@ const ExecutiveDashboard = ({ projects, professionals, onProfessionalClick, onPr
           <div className="h-48">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={stats.situationData} dataKey="value" cx="50%" cy="50%" outerRadius={70} label={({ name, value }) => `${name}: ${value}`}>
+                <Pie
+                  data={stats.situationData}
+                  dataKey="value"
+                  cx="50%"
+                  cy="50%"
+                  outerRadius={70}
+                  label={({ name, value }) => `${name}: ${value}`}
+                >
                   {stats.situationData.map((entry, i) => (
                     <Cell key={i} fill={entry.color} />
                   ))}
@@ -135,16 +200,26 @@ const ExecutiveDashboard = ({ projects, professionals, onProfessionalClick, onPr
             <AlertCircle className="h-4 w-4" /> Críticos ({stats.critical.length})
           </h3>
           <div className="space-y-2">
-            {stats.critical.map(p => (
-              <button key={p.id} onClick={() => onProjectClick(p.id)} className="w-full text-left rounded-lg bg-danger/5 border border-danger/20 p-3 hover:bg-danger/10 transition-colors">
+            {stats.critical.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => onProjectClick(p.id)}
+                className="w-full text-left rounded-lg bg-danger/5 border border-danger/20 p-3 hover:bg-danger/10 transition-colors"
+              >
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-foreground">{p.name}</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">{p.type === 'operacao' ? 'Operação' : 'Projeto'}</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                    {p.type === 'operacao' ? 'Operação' : 'Projeto'}
+                  </span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">{p.category} · {p.progress}%</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {p.category} · {p.progress}%
+                </p>
               </button>
             ))}
-            {stats.critical.length === 0 && <p className="text-xs text-muted-foreground">Nenhum</p>}
+            {stats.critical.length === 0 && (
+              <p className="text-xs text-muted-foreground">Nenhum</p>
+            )}
           </div>
         </div>
 
@@ -154,16 +229,26 @@ const ExecutiveDashboard = ({ projects, professionals, onProfessionalClick, onPr
             <AlertTriangle className="h-4 w-4" /> Em Risco ({stats.atRisk.length})
           </h3>
           <div className="space-y-2">
-            {stats.atRisk.map(p => (
-              <button key={p.id} onClick={() => onProjectClick(p.id)} className="w-full text-left rounded-lg bg-warning/5 border border-warning/20 p-3 hover:bg-warning/10 transition-colors">
-                <div className="flex items-center justify-between">
+            {stats.atRisk.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => onProjectClick(p.id)}
+                className="w-full text-left rounded-lg bg-warning/5 border border-warning/20 p-3 hover:bg-warning/10 transition-colors"
+              >
+                <div className="flex items-center justify_between">
                   <span className="text-sm font-medium text-foreground">{p.name}</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">{p.type === 'operacao' ? 'Operação' : 'Projeto'}</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                    {p.type === 'operacao' ? 'Operação' : 'Projeto'}
+                  </span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">{p.category} · {p.progress}%</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {p.category} · {p.progress}%
+                </p>
               </button>
             ))}
-            {stats.atRisk.length === 0 && <p className="text-xs text-muted-foreground">Nenhum</p>}
+            {stats.atRisk.length === 0 && (
+              <p className="text-xs text-muted-foreground">Nenhum</p>
+            )}
           </div>
         </div>
 
@@ -173,13 +258,21 @@ const ExecutiveDashboard = ({ projects, professionals, onProfessionalClick, onPr
             <CheckCircle className="h-4 w-4" /> Estáveis ({stats.stable.length})
           </h3>
           <div className="space-y-2">
-            {stats.stable.map(p => (
-              <button key={p.id} onClick={() => onProjectClick(p.id)} className="w-full text-left rounded-lg bg-success/5 border border-success/20 p-3 hover:bg-success/10 transition-colors">
+            {stats.stable.map((p) => (
+              <button
+                key={p.id}
+                onClick={() => onProjectClick(p.id)}
+                className="w-full text-left rounded-lg bg-success/5 border border-success/20 p-3 hover:bg-success/10 transition-colors"
+              >
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-foreground">{p.name}</span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">{p.type === 'operacao' ? 'Operação' : 'Projeto'}</span>
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                    {p.type === 'operacao' ? 'Operação' : 'Projeto'}
+                  </span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">{p.category} · {p.progress}%</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {p.category} · {p.progress}%
+                </p>
               </button>
             ))}
           </div>
@@ -193,7 +286,10 @@ const ExecutiveDashboard = ({ projects, professionals, onProfessionalClick, onPr
         </h3>
         <div className="flex flex-wrap gap-2">
           {stats.sortedTags.map(([tag, count]) => (
-            <span key={tag} className="rounded-full bg-secondary px-3 py-1 text-xs font-medium text-foreground">
+            <span
+              key={tag}
+              className="rounded-full bg_secondary px-3 py-1 text-xs font-medium text-foreground"
+            >
               {tag} <span className="text-muted-foreground ml-1">({count})</span>
             </span>
           ))}
@@ -206,18 +302,22 @@ const ExecutiveDashboard = ({ projects, professionals, onProfessionalClick, onPr
           <Users className="h-4 w-4 text-primary" /> Equipe ({stats.uniqueMembers.length} profissionais)
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-          {stats.uniqueMembers.map(member => (
+          {stats.uniqueMembers.map((member) => (
             <button
               key={member.name}
-              onClick={() => onProfessionalClick(member.name)}
+              onClick={() => member.name && onProfessionalClick(member.name)}
               className="flex items-center gap-3 rounded-lg bg-secondary/50 px-3 py-2.5 hover:bg-secondary transition-colors text-left"
             >
               <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/20 text-sm font-bold text-primary shrink-0">
-                {member.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                {getInitials(member.name)}
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-foreground truncate">{member.name}</p>
-                <p className="text-xs text-muted-foreground">{member.role} · {member.projectCount} projeto(s)</p>
+                <p className="text-sm font-medium text-foreground truncate">
+                  {member.name || 'Sem nome'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {member.role} · {member.projectCount} projeto(s)
+                </p>
               </div>
             </button>
           ))}

@@ -7,6 +7,18 @@ interface TeamListProps {
   onMemberClick?: (name: string) => void;
 }
 
+const getInitials = (rawName: string | undefined | null) => {
+  const name = rawName?.trim() || '';
+  if (!name) return '?';
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .map((n) => n[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+};
+
 const TeamList = ({ team, compact = false, onMemberClick }: TeamListProps) => {
   if (compact) {
     return (
@@ -15,10 +27,15 @@ const TeamList = ({ team, compact = false, onMemberClick }: TeamListProps) => {
           <div
             key={member.id}
             className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-card bg-secondary text-xs font-semibold text-secondary-foreground cursor-pointer hover:ring-2 hover:ring-primary/50 transition-all"
-            title={`${member.name} - ${member.role}`}
-            onClick={(e) => { e.stopPropagation(); onMemberClick?.(member.name); }}
+            title={`${member.name || 'Sem nome'} - ${member.role}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (member.name) {
+                onMemberClick?.(member.name);
+              }
+            }}
           >
-            {member.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+            {getInitials(member.name)}
           </div>
         ))}
         {team.length > 4 && (
@@ -35,15 +52,21 @@ const TeamList = ({ team, compact = false, onMemberClick }: TeamListProps) => {
       {team.map((member) => (
         <div
           key={member.id}
-          className={`flex items-center justify-between rounded-lg bg-secondary/50 px-3 py-2 ${onMemberClick ? 'cursor-pointer hover:bg-secondary transition-colors' : ''}`}
-          onClick={() => onMemberClick?.(member.name)}
+          className={`flex items-center justify-between rounded-lg bg-secondary/50 px-3 py-2 ${
+            onMemberClick ? 'cursor-pointer hover:bg-secondary transition-colors' : ''
+          }`}
+          onClick={() => {
+            if (member.name) {
+              onMemberClick?.(member.name);
+            }
+          }}
         >
           <div className="flex items-center gap-3">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/20 text-sm font-bold text-primary">
-              {member.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+              {getInitials(member.name)}
             </div>
             <div>
-              <p className="text-sm font-medium text-foreground">{member.name}</p>
+              <p className="text-sm font-medium text-foreground">{member.name || 'Sem nome'}</p>
               <p className="text-xs text-muted-foreground">{member.role}</p>
             </div>
           </div>
